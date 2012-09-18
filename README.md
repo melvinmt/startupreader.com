@@ -4,4 +4,4 @@ Project name is Startup Reader and it's going to be a newsreader with actual sta
 
 Copyright (c) 2012 Melvin Tercan
 
-This work is licensed under the Creative Commons Attribution-NonCommercial 3.0 Unported License. To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/3.0/ or see `LICENSE`. In short, commercial use of this work is not allowed without my permission.
+This work is licensed under the Creative Commons Attribution-NonCommercial 3.0 Unported License. To view a copy of this license, visit http://creativecommons.org/licenses/by-nc/3.0/ or see `LICENSE`.
