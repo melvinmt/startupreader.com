@@ -44,3 +44,7 @@ end
 package "golang-stable" do
   action :install
 end
+
+include_recipe "git"
+
+include_recipe "bzr"
