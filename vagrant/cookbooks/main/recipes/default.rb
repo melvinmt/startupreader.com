@@ -17,6 +17,10 @@ cookbook_file "/home/vagrant/.bashrc" do
   action :create
 end
 
+execute "second-sudo-apt-get-update" do
+  command "apt-get update"
+end
+
 apt_repository "mongo-10gen" do
   uri "http://downloads-distro.mongodb.org/repo/ubuntu-upstart"
   distribution "dist"
@@ -38,11 +42,14 @@ apt_repository "gophers-go-ppa" do
 end
 
 execute "export_go_paths" do
-  command "export GPATH=/var/www/app"
+  command "export GOPATH=/var/www/app"
+end
+
+execute "export_bin_path" do
   command "export PATH=$PATH:/var/www/app/bin"
 end
 
-execute "second-sudo-apt-get-update" do
+execute "third-sudo-apt-get-update" do
   command "apt-get update"
 end
 
