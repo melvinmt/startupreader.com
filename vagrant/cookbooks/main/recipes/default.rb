@@ -37,6 +37,11 @@ apt_repository "gophers-go-ppa" do
   action :add
 end
 
+execute "export_go_paths" do
+  command "export GPATH=/var/www/app"
+  command "export PATH=$PATH:/var/www/app/bin"
+end
+
 execute "second-sudo-apt-get-update" do
   command "apt-get update"
 end
@@ -47,4 +52,4 @@ end
 
 include_recipe "git"
 
-include_recipe "bzr"
+include_recipe "bazaar"
