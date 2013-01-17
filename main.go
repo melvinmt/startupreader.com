@@ -7,7 +7,7 @@ import (
 )
 
 type Startup struct {
-	_Id           bson.ObjectIdHex
+	Id            bson.ObjectId "_id"
 	Name          string
 	Blog_Url      string
 	Blog_Feed_Url string
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	for _, startup := range startups {
-		fmt.Printf("_Id: %s, Name: %s, BlogURL: %s, BlogFeedUrl: %s\n", startup._Id, startup.Name, startup.Blog_Url, startup.Blog_Feed_Url)
+		fmt.Printf("_Id: %s, Name: %s, BlogURL: %s, BlogFeedUrl: %s\n", startup.Id, startup.Name, startup.Blog_Url, startup.Blog_Feed_Url)
 	}
 
 }
