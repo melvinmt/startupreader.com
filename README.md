@@ -1,4 +1,4 @@
-My first attempt to create a web application in Go (work in progress!) on Google Appengine.
+My first attempt to create a web application in Go (work in progress!).
 
 Project name is Startup Reader and it's going to be a newsreader with actual startup blogs as its only source of news (which means no polluting tech/founder/lifehacker blogs).
 
