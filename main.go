@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"labix.org/v2/mgo"
@@ -17,6 +18,28 @@ type Startup struct {
 	Blog_Url      string
 	Blog_Feed_Url string
 	Homepage_Url  string
+}
+
+func urlGetContents(url string) (string, error) {
+	// fetch contents from url
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", errors.New("Could not fetch url")
+	}
+
+	// read entire contents into []byte
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.New("Could not read contents")
+	}
+
+	// write bytes into buffer
+	buf := bytes.NewBuffer(bodyBytes)
+
+	// convert buffer to string
+	bodyStr := buf.String()
+
+	return bodyStr, nil
 }
 
 func main() {
@@ -76,25 +99,11 @@ func main() {
 
 			apiRequest := loadFeedUrl + "?" + v.Encode()
 
-			// fetch contents from url
-			resp, err := http.Get(apiRequest)
+			bodyStr, err := urlGetContents(apiRequest)
 			if err != nil {
-				ch <- err
+				ch <- fmt.Sprintf("%s", err.Error())
 				return
 			}
-
-			// read entire contents into []byte
-			bodyBytes, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				ch <- err
-				return
-			}
-
-			// write bytes into buffer
-			buf := bytes.NewBuffer(bodyBytes)
-
-			// convert buffer to string
-			bodyStr := buf.String()
 
 			// return to channel
 			ch <- bodyStr
