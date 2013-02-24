@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"runtime"
+	"time"
 )
 
 type Startup struct {
@@ -24,10 +25,13 @@ type Startup struct {
 
 type Post struct {
 	// Id        bson.ObjectId "_id"
-	StartupId bson.ObjectId
-	Title     string
-	Link      string
-	Date      string
+	StartupId       bson.ObjectId
+	StartupName     string
+	StartupHomepage string
+	Title           string
+	Link            string
+	Date            string
+	Time            int
 }
 
 func urlGetContents(url string) ([]byte, error) {
@@ -197,12 +201,21 @@ func main() {
 					return
 				}
 
+				timestamp, _ := time.Parse(time.RFC1123Z, e.PublishedDate)
+
+				// if e.PublishedDate == "" {
+				// 	timestamp = time.Now()
+				// }
+
 				// insert post into database
 				post := Post{
-					StartupId: s.Id,
-					Title:     e.Title,
-					Link:      e.Link,
-					Date:      e.PublishedDate,
+					StartupId:       s.Id,
+					StartupName:     s.Name,
+					StartupHomepage: s.Homepage_Url,
+					Title:           e.Title,
+					Link:            e.Link,
+					Date:            e.PublishedDate,
+					Time:            int(timestamp.Unix()),
 				}
 				p.Insert(post)
 			}(startup, entry)
