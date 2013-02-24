@@ -1,3 +1,6 @@
+// Copyright (c) 2013 Melvin Tercan
+// This work is licensed under the Creative Commons Attribution-NonCommercial 3.0 Unported License.
+
 package main
 
 import (

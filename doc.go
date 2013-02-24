@@ -1,3 +1,0 @@
-// Documentation test
-
-package main
