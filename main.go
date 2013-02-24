@@ -71,7 +71,7 @@ func main() {
 			bson.M{"tc_posts": bson.M{"$gt": 1}},
 			bson.M{"blog_feed_url": bson.M{"$ne": ""}},
 			bson.M{"blog_url": bson.M{"$ne": ""}},
-		}}).Sort("-tc_posts").Limit(500).All(&startups)
+		}}).Sort("-tc_posts").All(&startups)
 
 	if err != nil {
 		panic(err)
@@ -97,7 +97,7 @@ func main() {
 		// fire off a goroutine to fetch url
 		go func(s Startup, c chan Startup) {
 
-			// build Google Feed API request
+			// build Google Feed API request url
 			loadFeedUrl := "https://ajax.googleapis.com/ajax/services/feed/load"
 
 			v := url.Values{}
@@ -106,15 +106,15 @@ func main() {
 
 			apiRequest := loadFeedUrl + "?" + v.Encode()
 
+			// retrieve contents
 			body, err := urlGetContents(apiRequest)
 			if err != nil {
 				c <- s
 				return
 			}
 
-			s.Feed = body
-
 			// return to channel
+			s.Feed = body
 			c <- s
 
 		}(startup, ch)
@@ -125,8 +125,10 @@ func main() {
 	// fetch contents from channel
 	for i := 0; i < it; i++ {
 
+		// retrieve Startup from channel
 		startup := <-ch
 
+		// raw JSON content
 		blob := startup.Feed
 
 		if startup.Feed == nil {
@@ -154,14 +156,15 @@ func main() {
 
 		var r Response
 
+		// decode json contents
 		err := json.Unmarshal(blob, &r)
 		if err != nil {
-			fmt.Println("error:", err)
+			// fmt.Println("error:", err)
 			continue
 		}
 
+		// retrieve data
 		feed := r.ResponseData.Feed
-
 		entries := feed.Entries
 
 		if entries == nil || len(entries) == 0 {
@@ -180,6 +183,8 @@ func main() {
 
 			// save into database
 			go func(s Startup, e Entry) {
+
+				// check if post already exists
 				posts := []Post{}
 				err = p.Find(
 					bson.M{"$and": []bson.M{
@@ -192,22 +197,18 @@ func main() {
 					return
 				}
 
+				// insert post into database
 				post := Post{
 					StartupId: s.Id,
 					Title:     e.Title,
 					Link:      e.Link,
 					Date:      e.PublishedDate,
 				}
-
 				err := p.Insert(post)
-
-				if err != nil {
-					// fmt.Println("error:", err)
-				}
-
 			}(startup, entry)
 		}
 
+		// make sure to clean up feed
 		startup.Feed = nil
 
 	}
