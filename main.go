@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime"
 )
 
 type Startup struct {
@@ -18,32 +19,37 @@ type Startup struct {
 	Blog_Url      string
 	Blog_Feed_Url string
 	Homepage_Url  string
+	Feed          []byte
 }
 
-func urlGetContents(url string) (string, error) {
+type Post struct {
+	// Id        bson.ObjectId "_id"
+	StartupId bson.ObjectId
+	Title     string
+	Link      string
+	Date      string
+}
+
+func urlGetContents(url string) ([]byte, error) {
 	// fetch contents from url
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", errors.New("Could not fetch url")
+		return nil, errors.New("Could not fetch url")
 	}
 
 	// read entire contents into []byte
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.New("Could not read contents")
+		return nil, errors.New("Could not read contents")
 	}
 
-	// write bytes into buffer
-	buf := bytes.NewBuffer(bodyBytes)
-
-	// convert buffer to string
-	bodyStr := buf.String()
-
-	return bodyStr, nil
+	return body, nil
 }
 
 func main() {
 	fmt.Println("startupreader!")
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// connect with db
 	session, err := mgo.Dial("127.0.0.1")
@@ -56,6 +62,7 @@ func main() {
 
 	// retrieve collection
 	c := session.DB("startupreader").C("startups")
+	p := session.DB("startupreader").C("posts")
 
 	// query collection
 	startups := []Startup{}
@@ -64,57 +71,144 @@ func main() {
 			bson.M{"tc_posts": bson.M{"$gt": 1}},
 			bson.M{"blog_feed_url": bson.M{"$ne": ""}},
 			bson.M{"blog_url": bson.M{"$ne": ""}},
-		}}).Sort("-tc_posts").Limit(10).All(&startups)
+		}}).Sort("-tc_posts").Limit(500).All(&startups)
 
 	if err != nil {
 		panic(err)
 	}
 
 	// initialize goroutine channel
-	ch := make(chan string)
+	ch := make(chan Startup)
 	it := 0
 
 	// loop through results
 	for _, startup := range startups {
 
-		fmt.Printf("_Id: %s, Name: %s, BlogURL: %s, BlogFeedUrl: %s\n", startup.Id, startup.Name, startup.Blog_Url, startup.Blog_Feed_Url)
+		// fmt.Printf("_Id: %s, Name: %s, BlogURL: %s, BlogFeedUrl: %s\n", startup.Id, startup.Name, startup.Blog_Url, startup.Blog_Feed_Url)
 
 		// validate blog feed url
 		var urlValidator = regexp.MustCompile("^http")
 
 		if !urlValidator.MatchString(startup.Blog_Feed_Url) {
-			fmt.Printf("not a valid url")
+			// fmt.Printf("not a valid url")
 			continue
 		}
 
 		// fire off a goroutine to fetch url
-		go func(blogFeedUrl string, ch chan string) {
+		go func(s Startup, c chan Startup) {
 
 			// build Google Feed API request
 			loadFeedUrl := "https://ajax.googleapis.com/ajax/services/feed/load"
 
 			v := url.Values{}
 			v.Set("v", "1.0")
-			v.Add("q", blogFeedUrl)
+			v.Add("q", s.Blog_Feed_Url)
 
 			apiRequest := loadFeedUrl + "?" + v.Encode()
 
-			bodyStr, err := urlGetContents(apiRequest)
+			body, err := urlGetContents(apiRequest)
 			if err != nil {
-				ch <- fmt.Sprintf("%s", err.Error())
+				c <- s
 				return
 			}
 
-			// return to channel
-			ch <- bodyStr
+			s.Feed = body
 
-		}(startup.Blog_Feed_Url, ch)
+			// return to channel
+			c <- s
+
+		}(startup, ch)
 
 		it++
 	}
 
 	// fetch contents from channel
 	for i := 0; i < it; i++ {
-		fmt.Printf("%s", <-ch)
+
+		startup := <-ch
+
+		blob := startup.Feed
+
+		if startup.Feed == nil {
+			continue
+		}
+
+		// ref: https://ajax.googleapis.com/ajax/services/feed/load?v=1.0&q=http%3A%2F%2Fgoogleblog.blogspot.com%2Ffeeds%2Fposts%2Fdefault%3Falt%3Drss
+
+		type Entry struct {
+			Title         string
+			Link          string
+			PublishedDate string
+		}
+
+		type Response struct {
+			ResponseData struct {
+				Feed struct {
+					FeedUrl string
+					Title   string
+					Link    string
+					Entries []Entry
+				}
+			}
+		}
+
+		var r Response
+
+		err := json.Unmarshal(blob, &r)
+		if err != nil {
+			fmt.Println("error:", err)
+			continue
+		}
+
+		feed := r.ResponseData.Feed
+
+		entries := feed.Entries
+
+		if entries == nil || len(entries) == 0 {
+			continue
+		}
+
+		fmt.Println()
+		fmt.Printf("[%s]\n", feed.Title)
+		fmt.Println()
+
+		for _, entry := range entries {
+			fmt.Printf("- %s\n", entry.Title)
+			fmt.Println(entry.Link)
+			fmt.Println(entry.PublishedDate)
+			fmt.Println()
+
+			// save into database
+			go func(s Startup, e Entry) {
+				posts := []Post{}
+				err = p.Find(
+					bson.M{"$and": []bson.M{
+						bson.M{"title": e.Title},
+						bson.M{"link": e.Link},
+						bson.M{"date": e.PublishedDate},
+					}}).All(&posts)
+
+				if len(posts) > 0 {
+					return
+				}
+
+				post := Post{
+					StartupId: s.Id,
+					Title:     e.Title,
+					Link:      e.Link,
+					Date:      e.PublishedDate,
+				}
+
+				err := p.Insert(post)
+
+				if err != nil {
+					// fmt.Println("error:", err)
+				}
+
+			}(startup, entry)
+		}
+
+		startup.Feed = nil
+
 	}
 }
