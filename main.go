@@ -204,7 +204,7 @@ func main() {
 					Link:      e.Link,
 					Date:      e.PublishedDate,
 				}
-				err := p.Insert(post)
+				p.Insert(post)
 			}(startup, entry)
 		}
 
